@@ -1,0 +1,2 @@
+bootloader.c:27:6:BL_fetchHostCommand	2
+bootloader.c:48:6:BL_Print_Message	1

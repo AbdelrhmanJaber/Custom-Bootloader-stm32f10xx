@@ -1,0 +1,2 @@
+../Core/Src/bootloader.c:27:6:BL_fetchHostCommand	16	static
+../Core/Src/bootloader.c:48:6:BL_Print_Message	112	static

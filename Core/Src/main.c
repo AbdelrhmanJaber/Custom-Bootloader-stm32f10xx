@@ -108,7 +108,7 @@ int main(void)
     /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
 	  BL_Print_Message(start_message);
-	  BL_fetchHostCommand();
+  BL_fetchHostCommand();
 
   }
   /* USER CODE END 3 */

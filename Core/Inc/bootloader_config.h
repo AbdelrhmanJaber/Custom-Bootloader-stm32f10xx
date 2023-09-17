@@ -14,4 +14,13 @@
 
 #define MAX_HOST_COMMAND_LENGHT              100
 
+
+#define CRC_SIZE_BYTES					     4
+
+
+#define BL_VENDOR_ID                100
+#define BL_MAJOR_VERSION         1
+#define BL_MINOR_VERSION         0
+#define BL_PATCH_VERSION         0
+
 #endif /* INC_BOOTLOADER_CONFIG_H_ */

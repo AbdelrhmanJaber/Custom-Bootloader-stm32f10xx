@@ -15,7 +15,9 @@
 #ifndef SRC_BOOTLOADER_H_
 #define SRC_BOOTLOADER_H_
 
-#define CRC_ENGINE_OBJ               &hcrc
+
+#define BL_hostCommunicationUART    &huart1
+#define CRC_REG                     &hcrc
 
 #define BL_GET_VER_CMD              0x10
 #define BL_GET_HELP_CMD             0x11
@@ -34,13 +36,8 @@
 /* Change Read Out Protection Level */
 #define BL_CHANGE_ROP_Level_CMD     0x21
 
-#define BL_VENDOR_ID                100
-#define BL_MAJOR_VERSION         1
-#define BL_MINOR_VERSION         1
-#define BL_PATCH_VERSION         0
 
 
-#define BL_hostCommunicationUART    &huart1
 
 
 void BL_Print_Message(char *format, ...);
@@ -49,17 +46,14 @@ void BL_fetchHostCommand(void);
 
 
 typedef enum{
-	BL_NACK = 0,
-	BL_OK
+	BL_STATUS_OK = 0,
+	BL_STATUS_NOK,
+	BL_CRC_OK,
+	BL_CRC_NOK
 }BL_Status;
 
-#define CRC_VERIFICATION_FAILED      0x00
-#define CRC_VERIFICATION_PASSED      0x01
 
-#define CBL_SEND_NACK                0xAB
-#define CBL_SEND_ACK                 0xCD
-#define CRC_TYPE_SIZE_BYTE           4
-
-
+#define BL_ACK                       0xAB
+#define BL_NACK                      0xCD
 
 #endif /* SRC_BOOTLOADER_H_ */

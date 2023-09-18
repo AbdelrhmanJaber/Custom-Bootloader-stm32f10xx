@@ -37,7 +37,7 @@
 #define BL_CHANGE_ROP_Level_CMD     0x21
 
 
-
+typedef void (*pMainApp) (void) ;
 
 
 void BL_Print_Message(char *format, ...);

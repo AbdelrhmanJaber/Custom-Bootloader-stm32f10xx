@@ -215,6 +215,7 @@ static BL_Status Bootloader_Get_Help(uint8_t *copy_Puint8_hostBuffer){
 			/*send ACK to the host*/
 			Bootloader_Send_ACK(12);
 			Bootloader_Send_Data_To_Host((uint8_t *)&Bootloader_Supported_CMDs[0] , 12);
+			Bootloader_Jump_To_Address(hostBuffer);
 		}else{
 			status = BL_STATUS_NOK;
 			Bootloader_Send_NACK();
@@ -252,7 +253,15 @@ static void Bootloader_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer){
 
 
 static void Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer){
+	uint32_t MSP_value = *((volatile uint32_t *)0x08008000UL);
+	uint32_t mainAPP_Adress =  *((volatile uint32_t *)(0x08008000UL + 4));
+	pMainApp Reset_Handler_test =  (pMainApp) mainAPP_Adress;
 
+	__set_MSP(MSP_value);
+
+	HAL_RCC_DeInit();
+
+	Reset_Handler_test();
 }
 
 

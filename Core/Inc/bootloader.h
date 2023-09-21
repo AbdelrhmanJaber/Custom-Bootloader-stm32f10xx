@@ -16,8 +16,16 @@
 #define SRC_BOOTLOADER_H_
 
 
-#define BL_hostCommunicationUART    &huart1
-#define CRC_REG                     &hcrc
+#define ADDRESS_IS_INVALID           0x00
+#define ADDRESS_IS_VALID             0x01
+
+#define FLASH_LOWER          FLASH_BASE_ADDRESS
+#define FLASH_UPPER          FLASH_END_ADDRESS
+
+#define RAM_LOWER            RAM_BASE_ADDRESS
+#define RAM_UPPER            RAM_END_ADDRESS
+
+
 
 #define BL_GET_VER_CMD              0x10
 #define BL_GET_HELP_CMD             0x11
@@ -37,7 +45,7 @@
 #define BL_CHANGE_ROP_Level_CMD     0x21
 
 
-typedef void (*pMainApp) (void) ;
+typedef void (*jumpAdressPtr)(void);
 
 
 void BL_Print_Message(char *format, ...);
@@ -49,7 +57,9 @@ typedef enum{
 	BL_STATUS_OK = 0,
 	BL_STATUS_NOK,
 	BL_CRC_OK,
-	BL_CRC_NOK
+	BL_CRC_NOK,
+	BL_ADDRESS_AVAILABLE,
+	BL_ADDRESS_UNAVAILABLE
 }BL_Status;
 
 

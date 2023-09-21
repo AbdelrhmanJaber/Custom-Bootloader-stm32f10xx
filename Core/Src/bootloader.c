@@ -8,9 +8,11 @@
 
 #include"STD_Types.h"
 
-#include"bootloader.h"
+#include"bootloader_private.h"
 
 #include"bootloader_config.h"
+
+#include"bootloader.h"
 
 /****************** static function declaration ******************/
 
@@ -18,7 +20,7 @@ static BL_Status Bootloader_Get_Version(uint8_t *copy_Puint8_hostBuffer);
 static BL_Status Bootloader_Get_Help(uint8_t *copy_Puint8_hostBuffer);
 static BL_Status Bootloader_Get_Chip_Identification_Number(uint8_t *copy_Puint8_hostBuffer);
 static void Bootloader_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer);
-static void Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer);
+static BL_Status Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer);
 static void Bootloader_Erase_Flash(uint8_t *copy_Puint8_hostBuffer);
 static void Bootloader_Memory_Write(uint8_t *copy_Puint8_hostBuffer);
 static void Bootloader_Enable_RW_Protection(uint8_t *copy_Puint8_hostBuffer);
@@ -58,6 +60,11 @@ static uint8_t hostBuffer[MAX_HOST_COMMAND_LENGHT];
 
 #define  TEST_BOOTLOADER     0x10
 
+
+static void test(void){
+
+}
+
 void BL_fetchHostCommand(void){
 	uint8_t dataLenght = 0 ;
 	BL_Status status = BL_STATUS_NOK;
@@ -89,7 +96,8 @@ void BL_fetchHostCommand(void){
 			break;
 		}
 		case BL_GO_TO_ADDR_CMD:{
-			BL_Print_Message("CBL_GO_TO_ADDR_CMD \r\n");
+			status = Bootloader_Jump_To_Address(hostBuffer);
+			if(status == BL_STATUS_NOK) BL_Print_Message("Error GET HELP CMD \r\n");
 			break;
 		}
 		case BL_FLASH_ERASE_CMD:{
@@ -215,7 +223,6 @@ static BL_Status Bootloader_Get_Help(uint8_t *copy_Puint8_hostBuffer){
 			/*send ACK to the host*/
 			Bootloader_Send_ACK(12);
 			Bootloader_Send_Data_To_Host((uint8_t *)&Bootloader_Supported_CMDs[0] , 12);
-			Bootloader_Jump_To_Address(hostBuffer);
 		}else{
 			status = BL_STATUS_NOK;
 			Bootloader_Send_NACK();
@@ -247,21 +254,55 @@ static BL_Status Bootloader_Get_Chip_Identification_Number(uint8_t *copy_Puint8_
 }
 
 
-static void Bootloader_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer){
-
+static uint8_t Host_Address_Verification(uint32_t copy_uint32_jumpAddress){
+	uint8_t address_verification = ADDRESS_IS_INVALID;
+	if(copy_uint32_jumpAddress >= FLASH_LOWER && copy_uint32_jumpAddress <= FLASH_UPPER){
+		address_verification = ADDRESS_IS_VALID;
+	}
+	else if(copy_uint32_jumpAddress >= RAM_LOWER && copy_uint32_jumpAddress <= RAM_UPPER){
+		address_verification = address_verification;
+	}
+	return address_verification;
 }
 
 
-static void Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer){
-	uint32_t MSP_value = *((volatile uint32_t *)0x08008000UL);
-	uint32_t mainAPP_Adress =  *((volatile uint32_t *)(0x08008000UL + 4));
-	pMainApp Reset_Handler_test =  (pMainApp) mainAPP_Adress;
-
-	__set_MSP(MSP_value);
-
-	HAL_RCC_DeInit();
-
-	Reset_Handler_test();
+static BL_Status Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer){
+	BL_Status status = BL_STATUS_NOK;
+	uint8_t address_verification = ADDRESS_IS_INVALID;
+	uint8_t commandLenght;
+	uint32_t CRC_hostValue = 0;
+	uint32_t jumpAddress = 0;
+	uint32_t MSP_Value = 0;
+	uint32_t MAIN_ADDRESS = 0;
+	commandLenght = copy_Puint8_hostBuffer[0] + 1;
+	CRC_hostValue = *(uint32_t*)(copy_Puint8_hostBuffer + commandLenght - CRC_SIZE_BYTES);
+	status = Bootloader_CRC_Verify(&copy_Puint8_hostBuffer[0], commandLenght - CRC_SIZE_BYTES
+				, CRC_hostValue);
+	if(status == BL_CRC_OK){
+		Bootloader_Send_ACK(1);
+		jumpAddress = *((uint32_t *)&hostBuffer[2]);
+		address_verification = Host_Address_Verification(jumpAddress);
+		if(address_verification == ADDRESS_IS_VALID){
+			Bootloader_Send_Data_To_Host( (uint8_t *)&address_verification , 1);
+			/*JUMP TO THE ADDRESS*/
+			/*CASTING To pointer to function*/
+			MSP_Value = *((volatile uint32_t *)jumpAddress);
+			MAIN_ADDRESS = jumpAddress + 4;
+			jumpAdressPtr addresToJumpPF = (jumpAdressPtr)MAIN_ADDRESS;
+			__set_MSP(MSP_Value);
+			HAL_RCC_DeInit();
+			addresToJumpPF();
+			status = BL_STATUS_OK;
+		}
+		else{
+			Bootloader_Send_Data_To_Host( (uint8_t *)&address_verification , 1);
+		}
+	}
+	else{
+		status = BL_STATUS_NOK;
+		Bootloader_Send_NACK();
+	}
+	return status;
 }
 
 
@@ -295,15 +336,14 @@ static void Bootloader_Change_Read_Protection_Level(uint8_t *copy_Puint8_hostBuf
 }
 
 
-static uint8_t Host_Address_Verification(uint32_t copy_uint32_jumpAddress){
-
-}
 
 static uint8_t Perform_Flash_Erase(uint8_t copy_uint8_sectorNumber, uint8_t copy_uint8_numberOfSectors){
 
 }
 
 
+static void Bootloader_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer){
 
+}
 
 

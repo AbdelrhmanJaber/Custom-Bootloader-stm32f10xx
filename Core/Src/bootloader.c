@@ -21,7 +21,7 @@ static BL_Status Bootloader_Get_Help(uint8_t *copy_Puint8_hostBuffer);
 static BL_Status Bootloader_Get_Chip_Identification_Number(uint8_t *copy_Puint8_hostBuffer);
 static void Bootloader_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer);
 static BL_Status Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer);
-static void Bootloader_Erase_Flash(uint8_t *copy_Puint8_hostBuffer);
+static BL_Status Bootloader_Erase_Flash(uint8_t *copy_Puint8_hostBuffer);
 static void Bootloader_Memory_Write(uint8_t *copy_Puint8_hostBuffer);
 static void Bootloader_Enable_RW_Protection(uint8_t *copy_Puint8_hostBuffer);
 static void Bootloader_Memory_Read(uint8_t *copy_Puint8_hostBuffer);
@@ -34,7 +34,7 @@ static void Bootloader_Send_ACK(uint8_t copy_uint8_replayLenght);
 static void Bootloader_Send_NACK(void);
 static void Bootloader_Send_Data_To_Host(uint8_t *copy_Puint8_hostBuffer, uint32_t copy_uint32_dataLenght);
 static uint8_t Host_Address_Verification(uint32_t copy_uint32_jumpAddress);
-static uint8_t Perform_Flash_Erase(uint8_t copy_uint8_sectorNumber, uint8_t copy_uint8_numberOfSectors);
+static uint8_t Perform_Flash_Erase(uint8_t copy_uint8_pageNumber, uint8_t copy_uint8_numberOfPages);
 
 /************************** variables and structures definition***************************************/
 
@@ -62,7 +62,7 @@ static uint8_t hostBuffer[MAX_HOST_COMMAND_LENGHT];
 
 
 static void test(void){
-
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
 }
 
 void BL_fetchHostCommand(void){
@@ -137,6 +137,7 @@ void BL_fetchHostCommand(void){
 
 
 void BL_Print_Message(char *format, ...){
+	test();
 	char Messsage[100] = {0};
 	va_list args;
 	va_start(args, format);
@@ -173,7 +174,6 @@ static BL_Status Bootloader_CRC_Verify(uint8_t *copy_Puint8_Data, uint32_t copy_
 	BL_Status status = BL_CRC_NOK;
 	uint32_t CRC_value = 0;
 	uint32_t bufferData;
-
 	/*calculate CRC*/
 	for(uint8_t counter = 0 ; counter < copy_uint32_dataLenght ; counter++){
 		bufferData = (uint32_t)copy_Puint8_Data[counter];
@@ -272,8 +272,6 @@ static BL_Status Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer){
 	uint8_t commandLenght;
 	uint32_t CRC_hostValue = 0;
 	uint32_t jumpAddress = 0;
-	uint32_t MSP_Value = 0;
-	uint32_t MAIN_ADDRESS = 0;
 	commandLenght = copy_Puint8_hostBuffer[0] + 1;
 	CRC_hostValue = *(uint32_t*)(copy_Puint8_hostBuffer + commandLenght - CRC_SIZE_BYTES);
 	status = Bootloader_CRC_Verify(&copy_Puint8_hostBuffer[0], commandLenght - CRC_SIZE_BYTES
@@ -286,11 +284,7 @@ static BL_Status Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer){
 			Bootloader_Send_Data_To_Host( (uint8_t *)&address_verification , 1);
 			/*JUMP TO THE ADDRESS*/
 			/*CASTING To pointer to function*/
-			MSP_Value = *((volatile uint32_t *)jumpAddress);
-			MAIN_ADDRESS = jumpAddress + 4;
-			jumpAdressPtr addresToJumpPF = (jumpAdressPtr)MAIN_ADDRESS;
-			__set_MSP(MSP_Value);
-			HAL_RCC_DeInit();
+			jumpAdressPtr addresToJumpPF = (jumpAdressPtr)(jumpAddress + 1);
 			addresToJumpPF();
 			status = BL_STATUS_OK;
 		}
@@ -306,8 +300,37 @@ static BL_Status Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer){
 }
 
 
-static void Bootloader_Erase_Flash(uint8_t *copy_Puint8_hostBuffer){
+static uint8_t Perform_Flash_Erase(uint8_t copy_uint8_pageNumber, uint8_t copy_uint8_numberOfPages){
+	/*check if valid page number*/
+	/*check if user want to erase all the flash or pages*/
+	/*init flash erasing*/
+	/*unlock flash*/
+	/*erasing flash*/
+	/*lock flash*/
+}
 
+static BL_Status Bootloader_Erase_Flash(uint8_t *copy_Puint8_hostBuffer){
+	BL_Status status = BL_STATUS_NOK ;
+	uint8_t commandLenght ;
+	uint32_t CRC_hostValue = 0 ;
+	uint8_t eraseStatus = UNSUCCESSFUL_ERASE ;
+	commandLenght = copy_Puint8_hostBuffer[0] + 1 ;
+	CRC_hostValue = *(uint32_t*)(copy_Puint8_hostBuffer + commandLenght - CRC_SIZE_BYTES) ;
+	status = Bootloader_CRC_Verify(&copy_Puint8_hostBuffer[0], commandLenght - CRC_SIZE_BYTES
+				, CRC_hostValue) ;
+	if(status == BL_CRC_OK){
+		Bootloader_Send_ACK(1);
+		/*erase flash*/
+		eraseStatus = Perform_Flash_Erase(hostBuffer[2] , hostBuffer[3]);
+		if(eraseStatus == SUCCESSFUL_ERASE)   status = BL_STATUS_OK;
+	    else   status = BL_STATUS_NOK;
+		 Bootloader_Send_Data_To_Host((uint8_t *)&eraseStatus , 1);
+	}
+	else{
+		status = BL_STATUS_NOK;
+		Bootloader_Send_NACK();
+	}
+	return status;
 }
 
 
@@ -335,11 +358,6 @@ static void Bootloader_Change_Read_Protection_Level(uint8_t *copy_Puint8_hostBuf
 
 }
 
-
-
-static uint8_t Perform_Flash_Erase(uint8_t copy_uint8_sectorNumber, uint8_t copy_uint8_numberOfSectors){
-
-}
 
 
 static void Bootloader_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer){

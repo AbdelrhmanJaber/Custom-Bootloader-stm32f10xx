@@ -17,13 +17,10 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include"STD_Types.h"
 #include "main.h"
 #include "crc.h"
 #include "usart.h"
 #include "gpio.h"
-
-#include"bootloader.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -100,14 +97,14 @@ int main(void)
 
   /* USER CODE END 2 */
 
-
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
-	  BL_Print_Message(start_message);
+	//  BL_Print_Message(start_message);
    BL_fetchHostCommand();
 
   }

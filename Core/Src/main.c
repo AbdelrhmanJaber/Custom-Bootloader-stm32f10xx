@@ -21,7 +21,7 @@
 #include "crc.h"
 #include "usart.h"
 #include "gpio.h"
-
+#include "bootloader.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 

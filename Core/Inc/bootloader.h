@@ -16,13 +16,23 @@
 #define SRC_BOOTLOADER_H_
 
 
+#define CBL_FLASH_MASS_ERASE                  0xff
+
+
 #define ADDRESS_IS_INVALID           0x00
 #define ADDRESS_IS_VALID             0x01
+
+#define FLASH_PAYLOAD_WRITE_FAILED   0x00
+#define FLASH_PAYLOAD_WRITE_PASSED   0x01
 
 #define INVALID_PAGE_NUMBER          0x00
 #define VALID_PAGE_NUMBER            0x01
 #define UNSUCCESSFUL_ERASE           0x02
 #define SUCCESSFUL_ERASE             0x03
+
+#define 	HAL_SUCCESSFUL_ERASE         			0xFFFFFFFFU
+
+#define CBL_FLASH_MAX_PAGE_NUMBER           12
 
 #define FLASH_LOWER          FLASH_BASE_ADDRESS
 #define FLASH_UPPER          FLASH_END_ADDRESS

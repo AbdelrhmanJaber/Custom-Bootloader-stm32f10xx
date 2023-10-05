@@ -17,6 +17,8 @@
 
 #define CRC_SIZE_BYTES					     4
 
+#define BL_FLASH_MAX_PAGES					 16
+
 
 #define BL_VENDOR_ID                100
 #define BL_MAJOR_VERSION         1

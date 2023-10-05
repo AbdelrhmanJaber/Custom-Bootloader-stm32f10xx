@@ -19,22 +19,18 @@
 static BL_Status Bootloader_Get_Version(uint8_t *copy_Puint8_hostBuffer);
 static BL_Status Bootloader_Get_Help(uint8_t *copy_Puint8_hostBuffer);
 static BL_Status Bootloader_Get_Chip_Identification_Number(uint8_t *copy_Puint8_hostBuffer);
-static void Bootloader_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer);
 static BL_Status Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer);
 static BL_Status Bootloader_Erase_Flash(uint8_t *copy_Puint8_hostBuffer);
-static void Bootloader_Memory_Write(uint8_t *copy_Puint8_hostBuffer);
-static void Bootloader_Enable_RW_Protection(uint8_t *copy_Puint8_hostBuffer);
-static void Bootloader_Memory_Read(uint8_t *copy_Puint8_hostBuffer);
-static void Bootloader_Get_Sector_Protection_Status(uint8_t *copy_Puint8_hostBuffer);
-static void Bootloader_Read_OTP(uint8_t *copy_Puint8_hostBuffer);
-static void Bootloader_Change_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer);
+static BL_Status Bootloader_Write_Data(uint8_t *copy_Puint8_hostBuffer);
 static BL_Status Bootloader_CRC_Verify(uint8_t *copy_Puint8_Data, uint32_t copy_uint32_dataLenght,
 		uint32_t copy_uint32_hostCRC);
 static void Bootloader_Send_ACK(uint8_t copy_uint8_replayLenght);
 static void Bootloader_Send_NACK(void);
 static void Bootloader_Send_Data_To_Host(uint8_t *copy_Puint8_hostBuffer, uint32_t copy_uint32_dataLenght);
 static uint8_t Host_Address_Verification(uint32_t copy_uint32_jumpAddress);
-static uint8_t Perform_Flash_Erase(uint8_t copy_uint8_pageNumber, uint8_t copy_uint8_numberOfPages);
+static uint8_t Perform_Flash_Erase(uint32_t PageAddress, uint8_t page_Number);
+static uint8_t FlashMemory_Paylaod_Write(uint16_t * pdata,uint32_t StartAddress,uint8_t Payloadlen);
+static BL_Status Bootloader_Write_Data(uint8_t *Host_Buffer);
 
 /************************** variables and structures definition***************************************/
 
@@ -74,7 +70,6 @@ void BL_fetchHostCommand(void){
 	dataLenght = hostBuffer[0];
 	/*fetch the command from the user*/
 	HAL_UART_Receive(BL_hostCommunicationUART, &hostBuffer[1], dataLenght, HAL_MAX_DELAY);
-	//HAL_UART_Receive(BL_hostCommunicationUART, &hostBuffer[1], dataLenght, HAL_MAX_DELAY);
 	switch(hostBuffer[1]){
 		case BL_GET_VER_CMD:{
 			status = Bootloader_Get_Version(hostBuffer);
@@ -101,11 +96,12 @@ void BL_fetchHostCommand(void){
 			break;
 		}
 		case BL_FLASH_ERASE_CMD:{
-			BL_Print_Message("CBL_FLASH_ERASE_CMD \r\n");
+			status = Bootloader_Erase_Flash(hostBuffer);
+			if(status == BL_STATUS_NOK) BL_Print_Message("Error GET HELP CMD \r\n");
 			break;
 		}
 		case BL_MEM_WRITE_CMD:{
-			BL_Print_Message("CBL_MEM_WRITE_CMD \r\n");
+			Bootloader_Write_Data(hostBuffer);
 			break;
 		}
 		case BL_ED_W_PROTECT_CMD:{
@@ -260,7 +256,7 @@ static uint8_t Host_Address_Verification(uint32_t copy_uint32_jumpAddress){
 		address_verification = ADDRESS_IS_VALID;
 	}
 	else if(copy_uint32_jumpAddress >= RAM_LOWER && copy_uint32_jumpAddress <= RAM_UPPER){
-		address_verification = address_verification;
+		address_verification = ADDRESS_IS_VALID;
 	}
 	return address_verification;
 }
@@ -300,13 +296,47 @@ static BL_Status Bootloader_Jump_To_Address(uint8_t *copy_Puint8_hostBuffer){
 }
 
 
-static uint8_t Perform_Flash_Erase(uint8_t copy_uint8_pageNumber, uint8_t copy_uint8_numberOfPages){
-	/*check if valid page number*/
-	/*check if user want to erase all the flash or pages*/
-	/*init flash erasing*/
-	/*unlock flash*/
-	/*erasing flash*/
-	/*lock flash*/
+static uint8_t Perform_Flash_Erase(uint32_t PageAddress, uint8_t page_Number)
+{
+	FLASH_EraseInitTypeDef pEraseInit;
+	HAL_StatusTypeDef Hal_status  = HAL_ERROR;
+	uint32_t PageError =0;
+	uint8_t PageStatus=INVALID_PAGE_NUMBER;
+
+	if(page_Number <= CBL_FLASH_MAX_PAGE_NUMBER)
+	{
+		if(page_Number<= (CBL_FLASH_MAX_PAGE_NUMBER - 1) || PageAddress == CBL_FLASH_MASS_ERASE)
+		{
+			PageStatus=VALID_PAGE_NUMBER;
+			if(PageAddress ==CBL_FLASH_MASS_ERASE )
+			{
+				pEraseInit.TypeErase =FLASH_TYPEERASE_PAGES;
+				pEraseInit.Banks = FLASH_BANK_1;
+				pEraseInit.PageAddress = 0x08008000;
+				pEraseInit.NbPages =96;
+			}
+			else{
+				pEraseInit.TypeErase =FLASH_TYPEERASE_PAGES;
+				pEraseInit.Banks = FLASH_BANK_1;
+				pEraseInit.PageAddress = PageAddress;
+				pEraseInit.NbPages =page_Number;
+			}
+			HAL_FLASH_Unlock();
+			Hal_status = HAL_FLASHEx_Erase(&pEraseInit,&PageError);
+			HAL_FLASH_Lock();
+			if(PageError == HAL_SUCCESSFUL_ERASE)
+			{
+				PageStatus=SUCCESSFUL_ERASE;
+			}
+			else{
+				PageStatus=UNSUCCESSFUL_ERASE;
+			}
+		}
+
+	}
+
+return PageStatus;
+
 }
 
 static BL_Status Bootloader_Erase_Flash(uint8_t *copy_Puint8_hostBuffer){
@@ -321,7 +351,7 @@ static BL_Status Bootloader_Erase_Flash(uint8_t *copy_Puint8_hostBuffer){
 	if(status == BL_CRC_OK){
 		Bootloader_Send_ACK(1);
 		/*erase flash*/
-		eraseStatus = Perform_Flash_Erase(hostBuffer[2] , hostBuffer[3]);
+		eraseStatus = Perform_Flash_Erase(*(uint32_t*)&hostBuffer[2] , hostBuffer[6]);
 		if(eraseStatus == SUCCESSFUL_ERASE)   status = BL_STATUS_OK;
 	    else   status = BL_STATUS_NOK;
 		 Bootloader_Send_Data_To_Host((uint8_t *)&eraseStatus , 1);
@@ -334,34 +364,109 @@ static BL_Status Bootloader_Erase_Flash(uint8_t *copy_Puint8_hostBuffer){
 }
 
 
-static void Bootloader_Memory_Write(uint8_t *copy_Puint8_hostBuffer){
 
+static BL_Status Bootloader_Write_Data(uint8_t *copy_Puint8_hostBuffer)
+{
+	BL_Status status = BL_STATUS_NOK ;
+	uint8_t commandLenght ;
+	uint32_t CRC_hostValue = 0 ;
+	uint32_t hostAddress = 0;
+	uint8_t Payload_Len = 0;
+	uint8_t addressVerification = ADDRESS_IS_INVALID;
+	uint8_t Flash_Payload_Write_Status = FLASH_PAYLOAD_WRITE_FAILED;
+	commandLenght = copy_Puint8_hostBuffer[0] + 1 ;
+	CRC_hostValue = *(uint32_t*)(copy_Puint8_hostBuffer + commandLenght - CRC_SIZE_BYTES) ;
+	status = Bootloader_CRC_Verify(&copy_Puint8_hostBuffer[0], commandLenght - CRC_SIZE_BYTES
+				, CRC_hostValue) ;
+
+	/* CRC Verification */
+	if(status == BL_CRC_OK)
+	{
+		Bootloader_Send_ACK(1);
+		hostAddress = *((uint32_t *)(&copy_Puint8_hostBuffer[2]));
+		Payload_Len = copy_Puint8_hostBuffer[6];
+		addressVerification = Host_Address_Verification(hostAddress);
+		if(ADDRESS_IS_VALID == addressVerification)
+		{
+
+			Flash_Payload_Write_Status = FlashMemory_Paylaod_Write((uint8_t *)&copy_Puint8_hostBuffer[7],
+					hostAddress, Payload_Len);
+
+			Bootloader_Send_Data_To_Host((uint8_t *)&Flash_Payload_Write_Status, 1);
+			status = BL_STATUS_OK;
+		}
+		else
+		{
+			addressVerification = ADDRESS_IS_INVALID;
+			Bootloader_Send_Data_To_Host((uint8_t *)&addressVerification, 1);
+		}
+	}
+	else
+	{
+		status = BL_STATUS_NOK;
+		/* Send Not acknowledge to the HOST */
+		Bootloader_Send_NACK();
+	}
+	return status;
 }
 
-static void Bootloader_Enable_RW_Protection(uint8_t *copy_Puint8_hostBuffer){
 
-}
+static uint8_t FlashMemory_Paylaod_Write(uint16_t * pdata,uint32_t StartAddress,uint8_t Payloadlen)
+{
+	HAL_StatusTypeDef HAL_Status = HAL_ERROR;
+	uint8_t Flash_Payload_Write_Status = FLASH_PAYLOAD_WRITE_FAILED;
+	uint16_t Payload_Counter = 0;
 
-static void Bootloader_Memory_Read(uint8_t *copy_Puint8_hostBuffer){
+	uint32_t Address=0;
+	uint8_t UpdataAdress=0;
 
-}
+	/* Unlock the FLASH control register access */
+	HAL_Status = HAL_FLASH_Unlock();
 
-static void Bootloader_Get_Sector_Protection_Status(uint8_t *copy_Puint8_hostBuffer){
+	if(HAL_Status != HAL_OK)
+	{
+		Flash_Payload_Write_Status = FLASH_PAYLOAD_WRITE_FAILED;
+	}
+	else
+	{
+		for(Payload_Counter=0 , UpdataAdress=0 ; Payload_Counter < Payloadlen/2 ; Payload_Counter++ , UpdataAdress+=2)
+		{
+			Address = StartAddress + UpdataAdress;
 
-}
+			/* Program a byte at a specified address */
+			HAL_Status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, Address , pdata[Payload_Counter]);
 
-static void Bootloader_Read_OTP(uint8_t *copy_Puint8_hostBuffer){
+			if(HAL_Status != HAL_OK)
+			{
+				Flash_Payload_Write_Status = FLASH_PAYLOAD_WRITE_FAILED;
+				break;
+			}
+			else
+			{
+				Flash_Payload_Write_Status = FLASH_PAYLOAD_WRITE_PASSED;
+			}
+		}
+	}
 
-}
+	if((FLASH_PAYLOAD_WRITE_PASSED == Flash_Payload_Write_Status) && (HAL_OK == HAL_Status))
+	{
+		/* Locks the FLASH control register access */
+		HAL_Status = HAL_FLASH_Lock();
 
-static void Bootloader_Change_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer){
-
-}
-
-
-
-static void Bootloader_Read_Protection_Level(uint8_t *copy_Puint8_hostBuffer){
-
+		if(HAL_Status != HAL_OK)
+		{
+			Flash_Payload_Write_Status = FLASH_PAYLOAD_WRITE_FAILED;
+		}
+		else
+		{
+			Flash_Payload_Write_Status = FLASH_PAYLOAD_WRITE_PASSED;
+		}
+	}
+	else
+	{
+		Flash_Payload_Write_Status = FLASH_PAYLOAD_WRITE_FAILED;
+	}
+	return Flash_Payload_Write_Status;
 }
 
 
